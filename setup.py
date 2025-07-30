@@ -16,18 +16,24 @@ with open('README.md') as f:
 include_dirs = ['src', 'webrtc-audio-processing']
 libraries = ['pthread', 'stdc++']
 define_macros = [
-    ('WEBRTC_LINUX', None),
     ('WEBRTC_POSIX', None),
     ('WEBRTC_NS_FLOAT', None),
     ('WEBRTC_AUDIO_PROCESSING_ONLY_BUILD', None)
 ]
-extra_compile_args = ['-std=c++11']
+
+if platform.system() != 'Darwin':
+    define_macros.append(('WEBRTC_LINUX', None))
+
+extra_compile_args = ['-std=c++11'] if platform.system() != 'Darwin' else []
 
 ap_sources = []
 ap_dir_prefix = 'webrtc-audio-processing/webrtc/'
 for i in range(8):
     ap_sources += glob(ap_dir_prefix + '*.c*')
     ap_dir_prefix += '*/'
+
+# Filter out Windows-specific files
+ap_sources = [src for src in ap_sources if not ('win.cc' in src.lower() or 'win.h' in src.lower())]
 
 rw_lock_generic_path = os.path.join('webrtc-audio-processing', 'webrtc', 'system_wrappers', 'source', 'rw_lock_generic.cc')
 condition_variable_path = os.path.join('webrtc-audio-processing', 'webrtc', 'system_wrappers', 'source', 'condition_variable.cc')
@@ -45,15 +51,18 @@ def get_yocto_var(var_name):
     return val
 
 def process_arch(arch, set_compile_flags=False):
-    global ap_sources, define_macros
+    global ap_sources, define_macros, extra_compile_args
     if arch.find('arm') >= 0:
         ap_sources = [src for src in ap_sources if src.find('mips.') < 0 and src.find('sse') < 0]
         define_macros.append(('WEBRTC_HAS_NEON', None))
-        if arch.find('arm64') >= 0:
-            define_macros.remove(('WEBRTC_LINUX', None))
-            define_macros.append(('WEBRTC_MAC', None))
-            define_macros.append(('WEBRTC_ARCH_ARM64', None))
-            define_macros.append(('WEBRTC_CLOCK_TYPE_REALTIME', None))
+        if platform.system() == 'Darwin' and arch.find('arm64') >= 0:
+            if ('WEBRTC_LINUX', None) in define_macros:
+                define_macros.remove(('WEBRTC_LINUX', None))
+            define_macros.extend([
+                ('WEBRTC_MAC', None),
+                ('WEBRTC_ARCH_ARM64', None),
+                ('WEBRTC_CLOCK_TYPE_REALTIME', None)
+            ])
             extra_compile_args.clear()
         else:
             if set_compile_flags:
@@ -78,7 +87,7 @@ if 'BITBAKE_BUILD' in os.environ:
     target_sys = get_yocto_var('TARGET_SYS')
     process_arch(target_sys)
 else:
-    process_arch(platform.machine(), set_compile_flags=True)
+    process_arch(platform.machine(), set_compile_flags=platform.system() != 'Darwin')
 
 sources = (
     ap_sources +
@@ -116,19 +125,13 @@ setup(
         'Development Status :: 2 - Pre-Alpha',
         'License :: OSI Approved :: BSD License',
         'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
+        'Operating System :: MacOS :: MacOS X',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: C++'
     ],
     license='BSD',
     keywords=['webrtc audioprocessing', 'voice activity detection', 'noise suppression', 'automatic gain control'],
-    platforms=['Linux'],
+    platforms=['Linux', 'MacOS'],
     package_dir={
         'webrtc_audio_processing': 'src'
     },
