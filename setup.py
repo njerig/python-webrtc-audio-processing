@@ -6,93 +6,104 @@ Python bindings of webrtc audio processing
 
 from glob import glob
 import platform
-import sys
 from setuptools import setup, Extension
 import os
+from pathlib import Path
+import subprocess
+
+def build_webrtc_audio_processing():
+    """
+    Build the WebRTC library if needed.
+    """
+    webrtc_dir = Path('webrtc-audio-processing')
+    build_dir = webrtc_dir / 'build'
+    install_dir = webrtc_dir / 'install'
+
+    if platform.system() == 'Darwin':
+        lib_path = install_dir / 'lib' / 'libwebrtc-audio-processing-2.dylib'
+    else:
+        lib_path = install_dir / 'lib' / 'libwebrtc-audio-processing-2.so'
+
+    if lib_path.exists():
+        print(f'Using existing WebRTC library at {lib_path}')
+        return str(lib_path)
+
+    if not build_dir.exists():
+        print("Building WebRTC audio processing library...")
+        subprocess.check_call([
+            'meson',
+            str(webrtc_dir),
+            'build',
+            f'-Dprefix={install_dir}',
+        ], cwd=str(webrtc_dir))
+    
+    subprocess.check_call([
+        'ninja',
+        '-C',
+        'build'
+    ])
+
+    subprocess.check_call([
+        'ninja',
+        '-C',
+        'build',
+        'install'
+    ])
+
+    return str(lib_path)
+
+library_file = build_webrtc_audio_processing()
 
 with open('README.md') as f:
     long_description = f.read()
 
-include_dirs = ['src', 'webrtc-audio-processing']
+os_name = platform.system()
+machine = platform.machine()
+
+sources = ['src/audio_processing_module.cpp', 'src/webrtc_audio_processing.i']
+
+include_dirs = [
+    'src', 
+    'webrtc-audio-processing',
+    'webrtc-audio-processing/webrtc',
+    'webrtc-audio-processing/subprojects/abseil-cpp-20240722.0'
+]
 libraries = ['pthread', 'stdc++']
 define_macros = [
-    ('WEBRTC_POSIX', None),
-    ('WEBRTC_NS_FLOAT', None),
-    ('WEBRTC_AUDIO_PROCESSING_ONLY_BUILD', None)
+    ('WEBRTC_AUDIO_PROCESSING_ONLY', None),
+    ('WEBRTC_NS_FLOAT', None)
 ]
 
-if platform.system() != 'Darwin':
+if os_name == 'Linux' or os_name == 'Darwin':
+    define_macros.append(('WEBRTC_POSIX', None))
+if os_name == 'Linux' or os_name == 'Android':
+    define_macros.append(('WEBRTC_CLOCK_TYPE_REALTIME', None))
+
+if os_name == 'Linux':
     define_macros.append(('WEBRTC_LINUX', None))
+    extra_link_args = [library_file]
+elif os_name == 'Darwin':
+    define_macros.append(('WEBRTC_MAC', None))
+    extra_link_args = [
+        library_file,  # This needs to be the actual library path
+        '-bundle', 
+        '-undefined', 'dynamic_lookup'
+    ]
+elif os_name == 'Windows':
+    define_macros.append(('WEBRTC_WIN', None))
+    extra_link_args = [library_file]
 
-extra_compile_args = ['-std=c++11'] if platform.system() != 'Darwin' else []
+extra_compile_args = ['-std=c++17']
+extra_link_args = [library_file]
 
-ap_sources = []
-ap_dir_prefix = 'webrtc-audio-processing/webrtc/'
-for i in range(8):
-    ap_sources += glob(ap_dir_prefix + '*.c*')
-    ap_dir_prefix += '*/'
-
-# Filter out Windows-specific files
-ap_sources = [src for src in ap_sources if not ('win.cc' in src.lower() or 'win.h' in src.lower())]
-
-rw_lock_generic_path = os.path.join('webrtc-audio-processing', 'webrtc', 'system_wrappers', 'source', 'rw_lock_generic.cc')
-condition_variable_path = os.path.join('webrtc-audio-processing', 'webrtc', 'system_wrappers', 'source', 'condition_variable.cc')
-
-if rw_lock_generic_path in ap_sources:
-    ap_sources.remove(rw_lock_generic_path)
-
-if condition_variable_path in ap_sources:
-    ap_sources.remove(condition_variable_path)
-
-def get_yocto_var(var_name):
-    val = os.environ.get(var_name, None)
-    if val is None:
-        raise Exception(f'Bitbake build detected, i.e. BB_CURRENT_TASK is set, but {var_name} is not set. Please do export {var_name} in your bitbake recipe.')
-    return val
-
-def process_arch(arch, set_compile_flags=False):
-    global ap_sources, define_macros, extra_compile_args
-    if arch.find('arm') >= 0:
-        ap_sources = [src for src in ap_sources if src.find('mips.') < 0 and src.find('sse') < 0]
-        define_macros.append(('WEBRTC_HAS_NEON', None))
-        if platform.system() == 'Darwin' and arch.find('arm64') >= 0:
-            if ('WEBRTC_LINUX', None) in define_macros:
-                define_macros.remove(('WEBRTC_LINUX', None))
-            define_macros.extend([
-                ('WEBRTC_MAC', None),
-                ('WEBRTC_ARCH_ARM64', None),
-                ('WEBRTC_CLOCK_TYPE_REALTIME', None)
-            ])
-            extra_compile_args.clear()
-        else:
-            if set_compile_flags:
-                extra_compile_args.append('-mfloat-abi=hard')
-                extra_compile_args.append('-mfpu=neon')
-    elif arch.find('aarch64') >= 0:
-        ap_sources = [src for src in ap_sources if src.find('mips.') < 0 and src.find('sse') < 0]
-        define_macros.append(('WEBRTC_HAS_NEON', None))
-        define_macros.append(('WEBRTC_ARCH_ARM64', None))
-    elif arch.find('x86') >= 0:
-        ap_sources = [src for src in ap_sources if src.find('mips.') < 0 and src.find('neon.') < 0]
-    elif arch.find('mips') >= 0:
-        ap_sources = [src for src in ap_sources if src.find('mips.') < 0 and src.find('neon.') < 0]
-    else:
-        raise Exception('Unsupported arch: %s' % arch)
-
-if 'BITBAKE_BUILD' in os.environ:
-    print('Building with bitbake build system')
-    cc_args = get_yocto_var('TARGET_CC_ARCH')
-    extra_compile_args += cc_args.split()
-
-    target_sys = get_yocto_var('TARGET_SYS')
-    process_arch(target_sys)
-else:
-    process_arch(platform.machine(), set_compile_flags=platform.system() != 'Darwin')
-
-sources = (
-    ap_sources +
-    ['src/audio_processing_module.cpp', 'src/webrtc_audio_processing.i']
-)
+if machine in ['arm64', 'aarch64']:
+    define_macros.extend([
+        ('WEBRTC_HAS_NEON', None),
+        ('WEBRTC_ARCH_ARM64', None)
+    ])
+elif 'arm' in machine:
+    define_macros.append(('WEBRTC_HAS_NEON', None))
+    extra_compile_args.extend(['-mfloat-abi=hard', '-mfpu=neon'])
 
 swig_opts = (
     ['-c++'] +
@@ -116,9 +127,10 @@ setup(
             sources=sources,
             swig_opts=swig_opts,
             include_dirs=include_dirs,
-            libraries=libraries,
             define_macros=define_macros,
-            extra_compile_args=extra_compile_args
+            extra_compile_args=extra_compile_args,
+            extra_link_args=extra_link_args,
+            libraries=libraries,
         )
     ],
     classifiers=[

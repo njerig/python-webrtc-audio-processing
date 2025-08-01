@@ -2,10 +2,26 @@
 
 SWIG := swig
 
-WEBRTCLIBFILE = ../webrtc-audio-processing/webrtc/modules/audio_processing/.libs/libwebrtc_audio_processing.a
+# Detect OS
+UNAME_S := $(shell uname -s)
 
-CXXFLAGS :=  -fPIC -std=c++11 -I. -I../webrtc-audio-processing  $(shell python-config --cflags) -DWEBRTC_AUDIO_PROCESSING_ONLY_BUILD -DWEBRTC_LINUX -DWEBRTC_POSIX -DWEBRTC_NS_FLOAT
-LDFLAGS := -shared $(shell python-config --ldflags) -lpthread
+# Set library file based on OS
+ifeq ($(UNAME_S),Darwin)
+    WEBRTCLIBFILE = ../webrtc-audio-processing/install/lib/libwebrtc-audio-processing-2.dylib
+else
+    WEBRTCLIBFILE = ../webrtc-audio-processing/install/lib/libwebrtc-audio-processing-2.so
+endif
+
+CXXFLAGS := -fPIC -std=c++17 -I. -I../webrtc-audio-processing -I../webrtc-audio-processing/webrtc -I../webrtc-audio-processing/subprojects/abseil-cpp-20240722.0  $(shell python-config --cflags) -DWEBRTC_AUDIO_PROCESSING_ONLY_BUILD -DWEBRTC_NS_FLOAT
+
+# Set platform-specific linking flags
+ifeq ($(UNAME_S),Darwin)
+    # macOS
+    LDFLAGS := -bundle -undefined dynamic_lookup $(shell python-config --ldflags) -lpthread
+else
+    # Linux and others
+    LDFLAGS := -shared $(shell python-config --ldflags) -lpthread
+endif
 CXX := g++
 
 
