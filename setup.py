@@ -11,48 +11,58 @@ import os
 from pathlib import Path
 import subprocess
 
-def build_webrtc_audio_processing():
-    """
-    Build the WebRTC library if needed.
-    """
-    webrtc_dir = Path('webrtc-audio-processing')
-    build_dir = webrtc_dir / 'build'
-    install_dir = webrtc_dir / 'install'
+# get the absolute path to the setup.py directory
+setup_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+webrtc_dir = setup_dir / 'webrtc-audio-processing'
+build_dir = webrtc_dir / 'build'
+install_dir = webrtc_dir / 'install'
 
-    if platform.system() == 'Darwin':
-        lib_path = install_dir / 'lib' / 'libwebrtc-audio-processing-2.dylib'
-    else:
-        lib_path = install_dir / 'lib' / 'libwebrtc-audio-processing-2.so'
+# make install_dir absolute
+install_dir = install_dir.absolute()
 
-    if lib_path.exists():
-        print(f'Using existing WebRTC library at {lib_path}')
-        return str(lib_path)
+if platform.system() == 'Darwin':
+    lib_name = 'libwebrtc-audio-processing-2.dylib'
+else:
+    lib_name = 'libwebrtc-audio-processing-2.so'
 
-    if not build_dir.exists():
-        print("Building WebRTC audio processing library...")
+lib_path = install_dir / 'lib' / lib_name
+
+# build WebRTC if needed
+if not lib_path.exists():
+    print("Building WebRTC audio processing library...")
+    
+    original_cwd = os.getcwd()
+    os.chdir(str(webrtc_dir))
+    
+    try:
+        # configure with meson
         subprocess.check_call([
             'meson',
-            str(webrtc_dir),
+            'setup',
             'build',
             f'-Dprefix={install_dir}',
-        ], cwd=str(webrtc_dir))
+        ])
+        
+        # build
+        subprocess.check_call([
+            'ninja',
+            '-C',
+            'build'
+        ])
+        
+        # install
+        subprocess.check_call([
+            'ninja',
+            '-C',
+            'build',
+            'install'
+        ])
+    finally:
+        os.chdir(original_cwd)
     
-    subprocess.check_call([
-        'ninja',
-        '-C',
-        'build'
-    ])
-
-    subprocess.check_call([
-        'ninja',
-        '-C',
-        'build',
-        'install'
-    ])
-
-    return str(lib_path)
-
-library_file = build_webrtc_audio_processing()
+    print(f"WebRTC library built at {lib_path}")
+else:
+    print(f"Using existing WebRTC library at {lib_path}")
 
 with open('README.md') as f:
     long_description = f.read()
@@ -81,20 +91,13 @@ if os_name == 'Linux' or os_name == 'Android':
 
 if os_name == 'Linux':
     define_macros.append(('WEBRTC_LINUX', None))
-    extra_link_args = [library_file]
 elif os_name == 'Darwin':
     define_macros.append(('WEBRTC_MAC', None))
-    extra_link_args = [
-        library_file,  # This needs to be the actual library path
-        '-bundle', 
-        '-undefined', 'dynamic_lookup'
-    ]
 elif os_name == 'Windows':
     define_macros.append(('WEBRTC_WIN', None))
-    extra_link_args = [library_file]
 
 extra_compile_args = ['-std=c++17']
-extra_link_args = [library_file]
+extra_link_args = [str(lib_path)]
 
 if machine in ['arm64', 'aarch64']:
     define_macros.extend([
