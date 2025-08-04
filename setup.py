@@ -4,7 +4,6 @@
 Python bindings of webrtc audio processing
 """
 
-from glob import glob
 import platform
 from setuptools import setup, Extension
 import os
