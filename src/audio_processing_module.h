@@ -55,6 +55,12 @@ public:
                                    int channel_count_in = 1);
 
     /**
+     * @brief Set the expected delay of the audio stream.
+        * @param delay_ms Delay in milliseconds.
+     */
+    void set_stream_delay(int delay_ms);
+
+    /**
      * @brief Get the sample rate of the input stream.
         * @return Sample rate in Hz.
      */
@@ -89,6 +95,12 @@ public:
         * @return Number of channels.
      */
     int get_reverse_channel_count_in() const;
+
+    /**
+     * @brief Get the expected delay of the audio stream.
+        * @return Delay in milliseconds.
+     */
+    int get_stream_delay() const;
 
     /**
      * @brief Process forard audio stream (i.e. from a microphone).

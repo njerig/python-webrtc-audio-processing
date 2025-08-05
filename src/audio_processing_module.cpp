@@ -67,6 +67,13 @@ void AudioProcessor::set_reverse_stream_format(int sample_rate_in,
     reverse_stream_config_in_ = std::make_unique<webrtc::StreamConfig>(sample_rate_in, channel_count_in);
 }
 
+void AudioProcessor::set_stream_delay(int delay_ms) {
+    if (delay_ms < 0) {
+        throw std::invalid_argument("Delay must be greater than 0 ms.");
+    }
+    apm_->set_stream_delay_ms(delay_ms);
+}
+
 int AudioProcessor::get_sample_rate_in() const {
     if (stream_config_in_) {
         return stream_config_in_->sample_rate_hz();
@@ -113,6 +120,10 @@ int AudioProcessor::get_reverse_channel_count_in() const {
     } else {
         throw std::runtime_error("Reverse stream format not set. Call set_reverse_stream_format() first.");
     }
+}
+
+int AudioProcessor::get_stream_delay() const {
+    return apm_->stream_delay_ms();
 }
 
 std::string AudioProcessor::process_stream(const std::string& input) {
