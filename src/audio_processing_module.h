@@ -21,6 +21,10 @@ public:
     /**
      * @brief Create an AudioProcessor instance.
      * Instantiated with default settings that can be changed later.
+        * @param enable_aec Enable Acoustic Echo Cancellation (AEC).
+        * @param enable_ns Enable Noise Suppression (NS).
+        * @param enable_agc Enable Automatic Gain Control (AGC).
+        * @param enable_vad Enable Voice Activity Detection (VAD).
      */
     AudioProcessor(bool enable_aec = true,
                    bool enable_ns = true,
@@ -86,21 +90,29 @@ public:
      */
     int get_reverse_channel_count_in() const;
 
+    /**
+     * @brief Process forard audio stream (i.e. from a microphone).
+        * @param input Input audio data as a string of interleaved 16-bit samples.
+     */
+    std::string process_stream(const std::string& input);
+
+    /**
+     * @brief Process reverse audio stream (i.e. from speakers).
+        * @param input Input audio data as a string of interleaved 16-bit samples.
+     */
+    std::string process_reverse_stream(const std::string& input);
+
+    int get_frame_size() const;
+
     ~AudioProcessor();
 
 private:
     webrtc::scoped_refptr<webrtc::AudioProcessing> apm_;
-    std::unique_ptr<webrtc::ProcessingConfig> processing_config_;
-    std::unique_ptr<webrtc::StreamConfig> stream_config_;
-    std::unique_ptr<webrtc::StreamConfig> reverse_stream_config_;
+    std::unique_ptr<webrtc::StreamConfig> stream_config_in_;
+    std::unique_ptr<webrtc::StreamConfig> stream_config_out_;
+    std::unique_ptr<webrtc::StreamConfig> reverse_stream_config_in_;
+    std::unique_ptr<webrtc::StreamConfig> reverse_stream_config_out_;
     webrtc::AudioProcessing::Config config_;
-
-    bool enable_aec_;
-    bool enable_ns_;
-    bool enable_agc_;
-    bool enable_vad_;
-
-    bool initialized_;
 };
 
 
