@@ -102,6 +102,10 @@ public:
      */
     int get_stream_delay() const;
 
+    bool aec_enabled() const;
+    bool ns_enabled() const;
+    bool agc_enabled() const;
+
     /**
      * @brief Process forard audio stream (i.e. from a microphone).
         * @param input Input audio data as a string of interleaved 16-bit samples.
