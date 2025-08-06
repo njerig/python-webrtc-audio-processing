@@ -24,12 +24,10 @@ public:
         * @param enable_aec Enable Acoustic Echo Cancellation (AEC).
         * @param enable_ns Enable Noise Suppression (NS).
         * @param enable_agc Enable Automatic Gain Control (AGC).
-        * @param enable_vad Enable Voice Activity Detection (VAD).
      */
     AudioProcessor(bool enable_aec = true,
                    bool enable_ns = true,
-                   bool enable_agc = true,
-                   bool enable_vad = true);
+                   bool enable_agc = true);
     
     /**
      * @brief Set the forward stream format.

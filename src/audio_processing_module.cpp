@@ -7,8 +7,7 @@
 
 AudioProcessor::AudioProcessor(bool enable_aec,
                                bool enable_ns,
-                               bool enable_agc,
-                               bool enable_vad) { 
+                               bool enable_agc) { 
     apm_ = webrtc::AudioProcessingBuilder().Create();
 
     // initialize echo cancelling

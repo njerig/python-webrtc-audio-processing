@@ -1,4 +1,4 @@
-from ..src.webrtc_audio_processing import AudioProcessor as AP
+from webrtc_audio_processing import AudioProcessor as AP
 import pytest
 import struct
 import math
