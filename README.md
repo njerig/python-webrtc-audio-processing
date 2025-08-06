@@ -13,7 +13,7 @@ Python bindings for WebRTC Audio Processing. This is a downstream version of [th
 git clone https://github.com/njerig/python-webrtc-audio-processing.git
 cd python-webrtc-audio-processing
 git submodule init && git submodule update
-pip install webrtc_audio_processing
+pip install ./webrtc_audio_processing
 ```
 
 ## Usage
