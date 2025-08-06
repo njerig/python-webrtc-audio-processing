@@ -1,41 +1,20 @@
 # WebRTC Audio Processing for Python
 
-[![Build Status](https://travis-ci.org/xiongyihui/python-webrtc-audio-processing.svg?branch=master)](https://travis-ci.org/xiongyihui/python-webrtc-audio-processing)
-[![Pypi](https://img.shields.io/pypi/v/webrtc_audio_processing.svg)](https://pypi.python.org/pypi/webrtc_audio_processing)
-
-Python binding of WebRTC Audio Processing.
+Python bindings for WebRTC Audio Processing. This is a downstream version of [this repo](https://github.com/xiongyihui/python-webrtc-audio-processing.git)'s work with the most recent 7 years of work on WebRTC as well as a slightly different interface. 
 
 ## Requirements
 + swig
++ meson
 + compile toolchain
-+ python
++ python3
 
 ## Build
-There are two way to build the package.
-
-1. using setup.py
-
-    ```bash
-    git clone https://github.com/xiongyihui/python-webrtc-audio-processing.git
-    cd python-webrtc-audio-processing
-    git submodule init && git submodule update
-    python setup.py build
-    sudo python setup.py install
-    ```
-
-2. using Makefile
-
-    ```bash
-    git clone https://github.com/xiongyihui/python-webrtc-audio-processing.git
-    cd python-webrtc-audio-processing
-    git submodule init && git submodule update
-    cd webrtc-audio-processing
-    ./autogen.sh
-    ./configure --with-pic
-    make
-    cd ../src
-    make
-    ```
+```bash
+git clone https://github.com/njerig/python-webrtc-audio-processing.git
+cd python-webrtc-audio-processing
+git submodule init && git submodule update
+pip install webrtc_audio_processing
+```
 
 ## Usage
 ```python
