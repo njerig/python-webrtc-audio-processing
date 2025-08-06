@@ -28,7 +28,7 @@ CXX := g++
 all: _webrtc_audio_processing.so
 
 webrtc_audio_processing_wrap.cpp: webrtc_audio_processing.i
-	$(SWIG) -I. -c++ -python -o $@ $^
+	$(SWIG) -I. -c++ -python -doxygen -o $@ $^
 
 _webrtc_audio_processing.so: webrtc_audio_processing_wrap.o audio_processing_module.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(WEBRTCLIBFILE)
