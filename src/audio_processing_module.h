@@ -4,6 +4,7 @@
 
 #include "webrtc/api/scoped_refptr.h"
 #include "webrtc/api/audio/audio_processing.h"
+#include "webrtc/common_audio/vad/include/vad.h"
 #include <memory>
 
 namespace webrtc {
@@ -24,10 +25,12 @@ public:
         * @param enable_aec Enable Acoustic Echo Cancellation (AEC).
         * @param enable_ns Enable Noise Suppression (NS).
         * @param enable_agc Enable Automatic Gain Control (AGC).
+        * @param enable_vad Enable Voice Activity Detection (VAD).
      */
     AudioProcessor(bool enable_aec = true,
                    bool enable_ns = true,
-                   bool enable_agc = true);
+                   bool enable_agc = true,
+                   bool enable_vad = true);
     
     /**
      * @brief Set the forward stream format.
@@ -57,6 +60,12 @@ public:
         * @param delay_ms Delay in milliseconds.
      */
     void set_stream_delay(int delay_ms);
+
+    /**
+     * @brief Set the VAD aggressiveness level.
+        * @param aggressiveness VAD aggressiveness level (0-3).
+     */
+    void set_vad_aggressiveness(int aggressiveness);
 
     /**
      * @brief Get the sample rate of the input stream.
@@ -103,6 +112,7 @@ public:
     bool aec_enabled() const;
     bool ns_enabled() const;
     bool agc_enabled() const;
+    bool vad_enabled() const;
 
     /**
      * @brief Process forard audio stream (i.e. from a microphone).
@@ -116,6 +126,12 @@ public:
      */
     std::string process_reverse_stream(const std::string& input);
 
+    /**
+     * @brief Check if voice was detected in the last processed frame.
+        * @return True if voice activity was detected in the last frame, false otherwise.
+     */
+    bool has_voice();
+
     int get_frame_size() const;
 
     ~AudioProcessor();
@@ -127,6 +143,12 @@ private:
     std::unique_ptr<webrtc::StreamConfig> reverse_stream_config_in_;
     std::unique_ptr<webrtc::StreamConfig> reverse_stream_config_out_;
     webrtc::AudioProcessing::Config config_;
+    
+    // VAD components
+    std::unique_ptr<webrtc::Vad> vad_;
+    bool vad_enabled_;
+    bool last_vad_activity_;
+    int vad_aggressiveness_;
 };
 
 

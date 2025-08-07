@@ -2,12 +2,14 @@
 
 #include "webrtc/api/audio/audio_processing.h"
 #include "webrtc/api/scoped_refptr.h"
+#include "webrtc/common_audio/vad/include/vad.h"
 #include <cstdint>
 
 
 AudioProcessor::AudioProcessor(bool enable_aec,
                                bool enable_ns,
-                               bool enable_agc) { 
+                               bool enable_agc,
+                               bool enable_vad) { 
     apm_ = webrtc::AudioProcessingBuilder().Create();
 
     // initialize echo cancelling
@@ -27,6 +29,15 @@ AudioProcessor::AudioProcessor(bool enable_aec,
     stream_config_in_ = std::make_unique<webrtc::StreamConfig>();
     stream_config_out_ = std::make_unique<webrtc::StreamConfig>();
     reverse_stream_config_in_ = std::make_unique<webrtc::StreamConfig>();
+    
+    // initialize VAD
+    vad_enabled_ = enable_vad;
+    vad_aggressiveness_ = webrtc::Vad::kVadNormal;
+    last_vad_activity_ = false;
+    
+    if (vad_enabled_) {
+        vad_ = webrtc::CreateVad(static_cast<webrtc::Vad::Aggressiveness>(vad_aggressiveness_));
+    }
 }
 
 void AudioProcessor::set_stream_format(int sample_rate_in, 
@@ -70,6 +81,18 @@ void AudioProcessor::set_stream_delay(int delay_ms) {
         throw std::invalid_argument("Delay must be greater than 0 ms.");
     }
     apm_->set_stream_delay_ms(delay_ms);
+}
+
+void AudioProcessor::set_vad_aggressiveness(int aggressiveness) {
+    if (aggressiveness < 0 || aggressiveness > 3) {
+        throw std::invalid_argument("VAD aggressiveness must be between 0 and 3.");
+    }
+    
+    vad_aggressiveness_ = aggressiveness;
+    
+    if (vad_enabled_ && vad_) {
+        vad_->Reset();
+    }
 }
 
 int AudioProcessor::get_sample_rate_in() const {
@@ -136,6 +159,10 @@ bool AudioProcessor::agc_enabled() const {
     return config_.gain_controller1.enabled;
 }
 
+bool AudioProcessor::vad_enabled() const {
+    return vad_enabled_;
+}
+
 std::string AudioProcessor::process_stream(const std::string& input) {
     if (!stream_config_in_ || !stream_config_out_) {
         throw std::runtime_error("Stream format not set. Call set_stream_format() first.");
@@ -155,6 +182,32 @@ std::string AudioProcessor::process_stream(const std::string& input) {
 
     // convert string to raw data
     const int16_t* input_data = reinterpret_cast<const int16_t*>(input.data());
+
+    // perform VAD if enabled
+    if (vad_enabled_ && vad_) {
+        // For VAD, we only process the first channel if multi-channel
+        int vad_samples = frame_size;
+        if (stream_config_in_->num_channels() > 1) {
+            // Extract first channel for VAD processing
+            std::vector<int16_t> mono_data(frame_size);
+            for (int i = 0; i < frame_size; ++i) {
+                mono_data[i] = input_data[i * stream_config_in_->num_channels()];
+            }
+            webrtc::Vad::Activity activity = vad_->VoiceActivity(
+                mono_data.data(), 
+                static_cast<size_t>(vad_samples), 
+                stream_config_in_->sample_rate_hz()
+            );
+            last_vad_activity_ = (activity == webrtc::Vad::kActive);
+        } else {
+            webrtc::Vad::Activity activity = vad_->VoiceActivity(
+                input_data, 
+                static_cast<size_t>(vad_samples), 
+                stream_config_in_->sample_rate_hz()
+            );
+            last_vad_activity_ = (activity == webrtc::Vad::kActive);
+        }
+    }
 
     // allocate output
     std::string output(expected_size, '\0');
@@ -207,6 +260,13 @@ int AudioProcessor::get_frame_size() const {
         throw std::runtime_error("Stream format not set. Call set_stream_format() first.");
     }
     return webrtc::AudioProcessing::GetFrameSize(stream_config_in_->sample_rate_hz());
+}
+
+bool AudioProcessor::has_voice() {
+    if (!vad_enabled_) {
+        throw std::runtime_error("VAD is not enabled. Call set_vad_enabled() first.");
+    }
+    return last_vad_activity_;
 }
 
 AudioProcessor::~AudioProcessor() {
