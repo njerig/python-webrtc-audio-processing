@@ -128,7 +128,8 @@ if need_build:
             'setup',
             'build',
             f'--prefix={install_dir}',
-            '--wrap-mode=default',
+            '--wrap-mode=forcefallback',
++           '--force-fallback-for=abseil-cpp',
             '--buildtype=release',
             '-Ddefault_library=shared',
         ])
