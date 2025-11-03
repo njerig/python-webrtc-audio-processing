@@ -5,7 +5,6 @@
 #include "webrtc/common_audio/vad/include/vad.h"
 #include <cstdint>
 
-
 AudioProcessor::AudioProcessor(bool enable_aec,
                                bool enable_ns,
                                bool enable_agc,
@@ -90,8 +89,9 @@ void AudioProcessor::set_vad_aggressiveness(int aggressiveness) {
     
     vad_aggressiveness_ = aggressiveness;
     
-    if (vad_enabled_ && vad_) {
-        vad_->Reset();
+    // Recreate VAD with new aggressiveness level
+    if (vad_enabled_) {
+        vad_ = webrtc::CreateVad(static_cast<webrtc::Vad::Aggressiveness>(vad_aggressiveness_));
     }
 }
 

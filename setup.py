@@ -129,7 +129,7 @@ if need_build:
             'build',
             f'--prefix={install_dir}',
             '--wrap-mode=forcefallback',
-+           '--force-fallback-for=abseil-cpp',
+            '--force-fallback-for=abseil-cpp',
             '--buildtype=release',
             '-Ddefault_library=shared',
         ])
@@ -151,6 +151,31 @@ if need_build:
             'install'
         ])
         
+        # Fix library install_name on macOS for proper rpath resolution
+        if platform.system() == 'Darwin':
+            # Fix both the symlink target (2.1) and the symlink itself (2)
+            lib_file_21 = install_dir / 'lib' / 'libwebrtc-audio-processing-2.1.dylib'
+            lib_file = install_dir / 'lib' / lib_name
+            
+            for lib_to_fix, lib_name_for_fix in [(lib_file_21, 'libwebrtc-audio-processing-2.1.dylib'), 
+                                                   (lib_file, lib_name)]:
+                if lib_to_fix.exists() and not lib_to_fix.is_symlink():
+                    print(f"Fixing library install name for {lib_name_for_fix}...")
+                    try:
+                        # Set install_name to use @rpath so our rpath settings work
+                        subprocess.check_call([
+                            'install_name_tool',
+                            '-id',
+                            f'@rpath/{lib_name_for_fix}',
+                            str(lib_to_fix)
+                        ])
+                        print(f"Library install name fixed to @rpath/{lib_name_for_fix}")
+                    except subprocess.CalledProcessError as e:
+                        print(f"Warning: Failed to fix library install name: {e}")
+                        print("Extension may still work if rpath is set correctly")
+                    except FileNotFoundError:
+                        print("Warning: install_name_tool not found. This may cause runtime issues.")
+        
     except subprocess.CalledProcessError as e:
         print(f"Failed to build WebRTC library: {e}")
         print("\nTroubleshooting steps:")
@@ -168,6 +193,41 @@ if need_build:
     
     if need_build:
         print(f"WebRTC library built at {lib_path}")
+    else:
+        # Fix install_name for existing library on macOS
+        if platform.system() == 'Darwin':
+            # Fix both the actual library (2.1) and symlink (2)
+            lib_file_21 = install_dir / 'lib' / 'libwebrtc-audio-processing-2.1.dylib'
+            lib_file = install_dir / 'lib' / lib_name
+            
+            for lib_to_fix, lib_name_for_fix in [(lib_file_21, 'libwebrtc-audio-processing-2.1.dylib'), 
+                                                   (lib_file, lib_name)]:
+                if lib_to_fix.exists() and not lib_to_fix.is_symlink():
+                    print(f"Checking library install name for {lib_name_for_fix}...")
+                    try:
+                        # Check current install name
+                        result = subprocess.run(
+                            ['otool', '-D', str(lib_to_fix)],
+                            capture_output=True,
+                            text=True
+                        )
+                        current_name = result.stdout.strip().split('\n')[-1] if result.stdout else ''
+                        
+                        # Fix if not using @rpath
+                        if '@rpath' not in current_name:
+                            print(f"Fixing library install name from {current_name}...")
+                            subprocess.check_call([
+                                'install_name_tool',
+                                '-id',
+                                f'@rpath/{lib_name_for_fix}',
+                                str(lib_to_fix)
+                            ])
+                            print(f"Library install name fixed to @rpath/{lib_name_for_fix}")
+                        else:
+                            print(f"Library install name already correct: {current_name}")
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        # Non-critical, continue anyway
+                        pass
 
 # read in README as description
 with open('README.md') as f:
@@ -176,7 +236,11 @@ with open('README.md') as f:
 os_name = platform.system()
 machine = platform.machine()
 
-sources = ['src/audio_processing_module.cpp', 'src/webrtc_audio_processing.i']
+sources = [
+    'src/audio_processing_module.cpp', 
+    'src/webrtc_audio_processing.i',
+    'webrtc-audio-processing/webrtc/common_audio/vad/vad.cc'
+]
 
 # find the actual abseil include directory
 abseil_include = None
@@ -241,6 +305,18 @@ elif os_name == 'Windows':
 
 extra_compile_args = ['-std=c++17']
 extra_link_args = [str(lib_path)]
+
+# On macOS, link by name and use rpath, don't link directly to file path
+if os_name == 'Darwin':
+    lib_dir = install_dir / 'lib'
+    # Link by library name (use 2.1 which is the actual library, not the symlink)
+    # The -l flag automatically adds lib prefix and .dylib suffix
+    extra_link_args = [f'-L{lib_dir}', '-lwebrtc-audio-processing-2.1']
+    # Set rpath so extension can find library
+    extra_link_args.append(f'-Wl,-rpath,{lib_dir}')
+    extra_link_args.append('-Wl,-rpath,@loader_path/../webrtc-audio-processing/install/lib')
+else:
+    extra_link_args = [str(lib_path)]
 
 if machine in ['arm64', 'aarch64']:
     define_macros.extend([
