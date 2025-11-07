@@ -26,7 +26,40 @@ if platform.system() == 'Darwin':
 else:
     lib_name = 'libwebrtc-audio-processing-2.so'
 
-lib_path = install_dir / 'lib' / lib_name
+# search for the library - it may be in install/lib or install/lib/<arch>/
+lib_path = None
+lib_dir = install_dir / 'lib'
+if lib_dir.exists():
+    # first try the direct path
+    candidate = lib_dir / lib_name
+    if candidate.exists():
+        lib_path = candidate
+    else:
+        # search in subdirectories (for multiarch installations)
+        for subdir in lib_dir.iterdir():
+            if subdir.is_dir():
+                candidate = subdir / lib_name
+                if candidate.exists():
+                    lib_path = candidate
+                    print(f"Found library in subdirectory: {lib_path}")
+                    break
+                # also check for versioned .so files (e.g., .so.1)
+                for lib_file in subdir.glob(f'{lib_name}.*'):
+                    if lib_file.is_file():
+                        # Check if there's a symlink
+                        symlink_path = subdir / lib_name
+                        if symlink_path.exists() or symlink_path.is_symlink():
+                            lib_path = symlink_path
+                        else:
+                            # use the versioned file directly
+                            lib_path = lib_file
+                        print(f"Found library: {lib_path}")
+                        break
+                if lib_path:
+                    break
+
+if not lib_path:
+    lib_path = install_dir / 'lib' / lib_name  # default fallback for error messages
 
 # check if webrtc-audio-processing submodule is initialized
 if not webrtc_dir.exists() or not any(webrtc_dir.iterdir()):
