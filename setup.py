@@ -330,17 +330,20 @@ elif os_name == 'Windows':
 extra_compile_args = ['-std=c++17']
 extra_link_args = [str(lib_path)]
 
-# On macOS, link by name and use rpath, don't link directly to file path
+# on macOS, link by name and use rpath, don't link directly to file path
 if os_name == 'Darwin':
     lib_dir = install_dir / 'lib'
-    # Link by library name (use 2.1 which is the actual library, not the symlink)
-    # The -l flag automatically adds lib prefix and .dylib suffix
+
     extra_link_args = [f'-L{lib_dir}', '-lwebrtc-audio-processing-2.1']
-    # Set rpath so extension can find library
+    # set rpath so extension can find library
     extra_link_args.append(f'-Wl,-rpath,{lib_dir}')
     extra_link_args.append('-Wl,-rpath,@loader_path/../webrtc-audio-processing/install/lib')
 else:
-    extra_link_args = [str(lib_path)]
+    # on Linux, link by name and use rpath
+    lib_dir = install_dir / 'lib'
+    extra_link_args = [f'-L{lib_dir}', '-lwebrtc-audio-processing-2']
+    # set rpath so extension can find library at runtime
+    extra_link_args.append(f'-Wl,-rpath,{lib_dir}')
 
 if machine in ['arm64', 'aarch64']:
     define_macros.extend([
