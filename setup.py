@@ -24,7 +24,7 @@ install_dir = install_dir.absolute()
 if platform.system() == 'Darwin':
     lib_name = 'libwebrtc-audio-processing-2.dylib'
 else:
-    lib_name = 'libwebrtc-audio-processing-2.so.1'
+    lib_name = 'libwebrtc-audio-processing-2.so'
 
 if platform.system() == 'Linux':
     # on Linux, libraries may be in architecture-specific subdirectories
@@ -340,7 +340,10 @@ if os_name == 'Darwin':
     extra_link_args.append('-Wl,-rpath,@loader_path/../webrtc-audio-processing/install/lib')
 else:
     # on Linux, link by name and use rpath
-    lib_dir = install_dir / 'lib'
+    if lib_path and lib_path.exists():
+        lib_dir = lib_path.parent
+    else:
+        lib_dir = install_dir / 'lib'
     extra_link_args = [f'-L{lib_dir}', '-lwebrtc-audio-processing-2']
     # set rpath so extension can find library at runtime
     extra_link_args.append(f'-Wl,-rpath,{lib_dir}')
