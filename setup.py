@@ -26,40 +26,31 @@ if platform.system() == 'Darwin':
 else:
     lib_name = 'libwebrtc-audio-processing-2.so'
 
-# search for the library - it may be in install/lib or install/lib/<arch>/
-lib_path = None
-lib_dir = install_dir / 'lib'
-if lib_dir.exists():
-    # first try the direct path
-    candidate = lib_dir / lib_name
-    if candidate.exists():
-        lib_path = candidate
-    else:
-        # search in subdirectories (for multiarch installations)
-        for subdir in lib_dir.iterdir():
-            if subdir.is_dir():
-                candidate = subdir / lib_name
-                if candidate.exists():
-                    lib_path = candidate
-                    print(f"Found library in subdirectory: {lib_path}")
-                    break
-                # also check for versioned .so files (e.g., .so.1)
-                for lib_file in subdir.glob(f'{lib_name}.*'):
-                    if lib_file.is_file():
-                        # Check if there's a symlink
-                        symlink_path = subdir / lib_name
-                        if symlink_path.exists() or symlink_path.is_symlink():
-                            lib_path = symlink_path
-                        else:
-                            # use the versioned file directly
-                            lib_path = lib_file
-                        print(f"Found library: {lib_path}")
-                        break
-                if lib_path:
-                    break
-
-if not lib_path:
-    lib_path = install_dir / 'lib' / lib_name  # default fallback for error messages
+if platform.system() == 'Linux':
+    # on Linux, libraries may be in architecture-specific subdirectories
+    lib_base = install_dir / 'lib'
+    
+    # try to find architecture-specific directory
+    arch_dirs = []
+    if lib_base.exists():
+        for item in lib_base.iterdir():
+            if item.is_dir() and '-' in item.name and 'linux' in item.name.lower():
+                arch_dirs.append(item)
+    
+    # check if library exists in architecture-specific directory
+    lib_path = None
+    if arch_dirs:
+        for arch_dir in arch_dirs:
+            candidate = arch_dir / lib_name
+            if candidate.exists():
+                lib_path = candidate
+                break
+    
+    # fallback to lib/ if not found in architecture-specific directory
+    if lib_path is None:
+        lib_path = lib_base / lib_name
+else:
+    lib_path = install_dir / 'lib' / lib_name
 
 # check if webrtc-audio-processing submodule is initialized
 if not webrtc_dir.exists() or not any(webrtc_dir.iterdir()):
