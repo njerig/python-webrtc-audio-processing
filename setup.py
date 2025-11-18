@@ -24,7 +24,7 @@ install_dir = install_dir.absolute()
 if platform.system() == 'Darwin':
     lib_name = 'libwebrtc-audio-processing-2.dylib'
 else:
-    lib_name = 'libwebrtc-audio-processing-2.so'
+    lib_name = 'libwebrtc-audio-processing-2.so.1'
 
 if platform.system() == 'Linux':
     # on Linux, libraries may be in architecture-specific subdirectories
