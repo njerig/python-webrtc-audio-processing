@@ -328,7 +328,7 @@ elif os_name == 'Windows':
     define_macros.append(('WEBRTC_WIN', None))
 
 extra_compile_args = ['-std=c++17']
-extra_link_args = [str(lib_path)]
+extra_link_args = []
 
 # on macOS, link by name and use rpath, don't link directly to file path
 if os_name == 'Darwin':
@@ -344,9 +344,10 @@ else:
         lib_dir = lib_path.parent
     else:
         lib_dir = install_dir / 'lib'
-    extra_link_args = [f'-L{lib_dir}', '-lwebrtc-audio-processing-2']
+    lib_dir_str = str(lib_dir.absolute())
+    extra_link_args = [f'-L{lib_dir_str}', '-lwebrtc-audio-processing-2']
     # set rpath so extension can find library at runtime
-    extra_link_args.append(f'-Wl,-rpath,{lib_dir}')
+    extra_link_args.append(f'-Wl,-rpath,{lib_dir_str}')
 
 if machine in ['arm64', 'aarch64']:
     define_macros.extend([
